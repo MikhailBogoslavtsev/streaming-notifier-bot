@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timedelta, timezone
 from html import unescape
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Set
 
 import requests
 from dotenv import load_dotenv
@@ -17,6 +17,27 @@ def get_env(name: str, required: bool = True, default: Optional[str] = None) -> 
     if required and (value is None or not value.strip()):
         raise ValueError(f"Environment variable '{name}' is required.")
     return (value or "").strip()
+
+
+# Default allowed countries: USA, Canada, United Kingdom (Russian and English spellings).
+DEFAULT_FILTER_COUNTRIES = (
+    "США,USA,United States,"
+    "Канада,Canada,"
+    "Великобритания,United Kingdom,UK,Англия,England"
+)
+
+
+def parse_countries(raw: str) -> Set[str]:
+    return {c.strip().casefold() for c in raw.split(",") if c.strip()}
+
+
+def item_countries(item: Dict[str, Any]) -> List[str]:
+    return [str(c.get("title", "")).strip() for c in item.get("countries") or [] if isinstance(c, dict)]
+
+
+def matches_countries(item: Dict[str, Any], allowed: Set[str]) -> bool:
+    """True if at least one of the item's countries is in the allowed set."""
+    return any(country.casefold() in allowed for country in item_countries(item))
 
 
 def item_link(item: Dict[str, Any]) -> str:
@@ -58,9 +79,13 @@ def main() -> None:
     telegram_chat_id = get_env("TELEGRAM_CHAT_ID")
     filter_year = int(get_env("FILTER_YEAR", required=False, default="1900"))
     filter_type = get_env("FILTER_TYPE", required=False, default="all").lower()
+    # An empty value (e.g. an unset GitHub secret) falls back to the default list.
+    allowed_countries = parse_countries(
+        get_env("FILTER_COUNTRIES", required=False) or DEFAULT_FILTER_COUNTRIES
+    )
 
     print(f"Starting streaming service notifier...")
-    print(f"Filter: year >= {filter_year}, type = {filter_type}")
+    print(f"Filter: year >= {filter_year}, type = {filter_type}, countries = {sorted(allowed_countries)}")
 
     # Fetch fresh items
     headers = {"Authorization": f"Bearer {streaming_token}"}
@@ -99,6 +124,8 @@ def main() -> None:
             continue
         if kind not in ("movie",):
             continue
+        if not matches_countries(item, allowed_countries):
+            continue
         filtered.append(item)
 
     print(f"After filtering: {len(filtered)} items")
@@ -113,7 +140,7 @@ def main() -> None:
         title = to_text(item.get("title") or item.get("name") or "Untitled", max_len=120)
         year = item.get("year") or "N/A"
         rating = item.get("imdb_rating") or "N/A"
-        countries = ", ".join([c.get("title", "") for c in item.get("countries", [])]) or "N/A"
+        countries = ", ".join(item_countries(item)) or "N/A"
         link = item_link(item)
         chunks.append(f"🎬 <b>{title}</b> ({year}) | {countries} | ⭐{rating} | <a href='{link}'>Смотреть</a>")
 

@@ -21,3 +21,4 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           FILTER_YEAR: ${{ secrets.FILTER_YEAR }}
           FILTER_TYPE: ${{ secrets.FILTER_TYPE }}
+          FILTER_COUNTRIES: ${{ secrets.FILTER_COUNTRIES }}
