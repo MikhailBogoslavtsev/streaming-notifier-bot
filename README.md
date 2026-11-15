@@ -10,6 +10,7 @@ Simple Python bot that checks a streaming service for newly added titles from th
 - Filters by:
   - `FILTER_YEAR` (minimum year)
   - `FILTER_TYPE` (`movie`, `serial`, or `all`)
+  - `FILTER_COUNTRIES` (optional, comma-separated; defaults to USA, Canada, United Kingdom — Russian and English names accepted). A movie is kept if **any** of its countries matches.
 - Sends formatted Telegram messages with:
   - title
   - year
@@ -48,6 +49,7 @@ Simple Python bot that checks a streaming service for newly added titles from th
    - `TELEGRAM_CHAT_ID` — target chat ID
    - `FILTER_YEAR` — minimum release year (example: `2024`)
    - `FILTER_TYPE` — `movie`, `serial`, or `all`
+   - `FILTER_COUNTRIES` — optional, comma-separated country names (default: USA, Canada, United Kingdom)
 
 5. Run:
 
@@ -67,5 +69,6 @@ Add these repository secrets in GitHub:
 - `TELEGRAM_CHAT_ID`
 - `FILTER_YEAR`
 - `FILTER_TYPE`
+- `FILTER_COUNTRIES` (optional; leave unset to use the default USA, Canada, United Kingdom)
 
 After adding secrets, workflow file `.github/workflows/notify.yml` will run automatically on schedule.
