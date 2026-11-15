@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timedelta, timezone
-from html import unescape
+from html import escape, unescape
 from typing import Any, Dict, Iterable, List, Optional, Set
 
 import requests
@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 STREAMING_API_BASE = "https://api.service-kp.com"
 STREAMING_WEB_BASE = "https://kino.pub"
 TELEGRAM_API_BASE = "https://api.telegram.org"
+TELEGRAM_MAX_LEN = 4000  # Telegram allows 4096; keep a small margin
 
 
 def get_env(name: str, required: bool = True, default: Optional[str] = None) -> str:
@@ -38,6 +39,21 @@ def item_countries(item: Dict[str, Any]) -> List[str]:
 def matches_countries(item: Dict[str, Any], allowed: Set[str]) -> bool:
     """True if at least one of the item's countries is in the allowed set."""
     return any(country.casefold() in allowed for country in item_countries(item))
+
+
+def short_plot(plot: Any, max_len: int = 160) -> str:
+    """Short Russian description from the API's `plot` field (free, no translation needed).
+
+    Prefers ending on a full sentence; otherwise cuts at a word boundary and adds "…".
+    """
+    text = " ".join(unescape(str(plot or "")).split())
+    if len(text) <= max_len:
+        return text
+    window = text[:max_len]
+    cut = max(window.rfind(". "), window.rfind("! "), window.rfind("? "))
+    if cut >= max_len // 3:
+        return window[: cut + 1]
+    return window.rsplit(" ", 1)[0].rstrip(" ,;:—-") + "…"
 
 
 def item_link(item: Dict[str, Any]) -> str:
@@ -135,18 +151,25 @@ def main() -> None:
         return
 
     # Format message
-    chunks = []
+    message = "🆕 Новинки streaming service:"
+    sent = 0
     for item in filtered[:20]:
-        title = to_text(item.get("title") or item.get("name") or "Untitled", max_len=120)
+        title = escape(to_text(item.get("title") or item.get("name") or "Untitled", max_len=120))
         year = item.get("year") or "N/A"
         rating = item.get("imdb_rating") or "N/A"
-        countries = ", ".join(item_countries(item)) or "N/A"
+        countries = escape(", ".join(item_countries(item)) or "N/A")
         link = item_link(item)
-        chunks.append(f"🎬 <b>{title}</b> ({year}) | {countries} | ⭐{rating} | <a href='{link}'>Смотреть</a>")
+        chunk = f"🎬 <b>{title}</b> ({year}) | {countries} | ⭐{rating} | <a href='{link}'>Смотреть</a>"
+        description = short_plot(item.get("plot"))
+        if description:
+            chunk += f"\n<i>{escape(description)}</i>"
+        # Add whole items only, so the 4096-char Telegram limit never cuts an HTML tag in half.
+        if len(message) + 2 + len(chunk) > TELEGRAM_MAX_LEN:
+            break
+        message += "\n\n" + chunk
+        sent += 1
 
-    message = "🆕 Новинки streaming service:\n\n" + "\n\n".join(chunks)
-    message = message[:4000]  # Telegram limit
-    print(f"Sending message with {len(filtered)} items...")
+    print(f"Sending message with {sent} of {len(filtered)} items...")
     send_telegram_message(telegram_bot_token, telegram_chat_id, message)
     print("Done!")
 
