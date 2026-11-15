@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 
 STREAMING_API_BASE = "https://api.service-kp.com"
-STREAMING_WEB_BASE = "https://kino.pub"
+STREAMING_WEB_BASE = "https://kino.watch"
 TELEGRAM_API_BASE = "https://api.telegram.org"
 TELEGRAM_MAX_LEN = 4000  # Telegram allows 4096; keep a small margin
 
